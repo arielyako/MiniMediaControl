@@ -36,7 +36,6 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         RestorePosition();
-        LoadPriority();
         
         _autoTimer.Tick += (_, _) => { _autoTimer.Stop(); AutoSelect(); };
         _tick.Tick += (_, _) => UpdateTimeline();
@@ -70,7 +69,6 @@ public partial class MainWindow : Window
             _current = null;
             _pinnedId = null;
             _wasPlaying.Clear();
-            SetHotkeys(false);      // delete this line if you didn't add the volume-knob code
             Hide();
             return;
         }
@@ -89,7 +87,6 @@ public partial class MainWindow : Window
         }
 
         if (!IsVisible) Show();
-        SetHotkeys(true);           // delete this line if you didn't add the volume-knob code
 
         int idx = prevId == null ? -1 : _sessions.FindIndex(s => s.SourceAppUserModelId == prevId);
         if (idx < 0) idx = Math.Min(_index, _sessions.Count - 1);
@@ -142,7 +139,7 @@ public partial class MainWindow : Window
             var app = session.SourceAppUserModelId ?? "";
             if (app.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) app = app[..^4];
             var dots = string.Concat(Enumerable.Range(0, _sessions.Count).Select(i => i == _index ? "● " : "○ "));
-            // SourceText.Text = $"{app}  ({_index + 1}/{_sessions.Count})  {dots}";
+            SourceText.Text = $"{app}  ({_index + 1}/{_sessions.Count})  {dots}";
             SourceText.Text = $"{dots}";
 
             UpdateTimeline();
@@ -369,28 +366,11 @@ public partial class MainWindow : Window
     private readonly List<GlobalSystemMediaTransportControlsSession> _watched = new();
     private readonly DispatcherTimer _autoTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
 
-    private void LoadPriority()
-    {
-        try
-        {
-            if (!File.Exists(PriorityPath))
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(PriorityPath)!);
-                File.WriteAllText(PriorityPath,
-                    JsonSerializer.Serialize(new[] { "Spotify" }, new JsonSerializerOptions { WriteIndented = true }));
-            }
-            _priority = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(PriorityPath)) ?? new();
-        }
-        catch { }
-    }
-
     private int Rank(GlobalSystemMediaTransportControlsSession s)
     {
         var id = s.SourceAppUserModelId ?? "";
-        var trimmed = TrimAppId(id);
-        for (int i = 0; i < _priority.Count; i++)
-            if (_priority[i].Equals(id, StringComparison.OrdinalIgnoreCase) ||
-                _priority[i].Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+        for (int i = 0; i < _priority.Length; i++)
+            if (_priority[i].Equals(id, StringComparison.OrdinalIgnoreCase))
                 return i;
         return int.MaxValue;
     }
