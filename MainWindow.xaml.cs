@@ -32,13 +32,16 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private readonly DispatcherTimer _topTimer = new() { Interval = TimeSpan.FromSeconds(2) };
 
+    private readonly Dictionary<string, DateTime> _lastPlaying = new();
+    private static readonly TimeSpan Grace = TimeSpan.FromSeconds(4);
+
     public MainWindow()
     {
         InitializeComponent();
         RestorePosition();
         
         _autoTimer.Tick += (_, _) => { _autoTimer.Stop(); AutoSelect(); };
-        _tick.Tick += (_, _) => UpdateTimeline();
+        _tick.Tick += (_, _) => { UpdateTimeline(); AutoSelect(); };
         _tick.Start();
         _topTimer.Tick += (_, _) => ReassertTopmost();
         _topTimer.Start();
@@ -51,16 +54,28 @@ public partial class MainWindow : Window
         };
     }
 
+    private bool IsRecentlyActive(GlobalSystemMediaTransportControlsSession s)
+    {
+        if (IsPlaying(s)) return true;
+        var id = s.SourceAppUserModelId ?? "";
+        return _lastPlaying.TryGetValue(id, out var t) && DateTime.UtcNow - t < Grace;
+    }
+
     // ---------- Session handling ----------
 
     private void RefreshSessions()
     {
         if (_mgr == null) return;
 
-        foreach (var w in _watched) w.PlaybackInfoChanged -= OnAnyPlaybackChanged;
+        foreach (var w in _watched)
+        {
+            w.PlaybackInfoChanged -= OnAnyPlaybackChanged;
+            w.MediaPropertiesChanged -= OnAnyMediaChanged;
+        }
         _watched.Clear();
 
         var prevId = _current?.SourceAppUserModelId;
+        var prevIds = _sessions.Select(x => x.SourceAppUserModelId ?? "").ToHashSet();
         _sessions = _mgr.GetSessions().ToList();
 
         if (_sessions.Count == 0)
@@ -76,13 +91,18 @@ public partial class MainWindow : Window
         foreach (var s in _sessions)
         {
             var id = s.SourceAppUserModelId ?? "";
-            if (!_wasPlaying.ContainsKey(id))
+            bool playing = IsPlaying(s);
+
+            if (playing)
             {
-                bool playing = IsPlaying(s);
-                if (playing && id != _pinnedId) _pinnedId = null;   // new session already playing
-                _wasPlaying[id] = playing;
+                _lastPlaying[id] = DateTime.UtcNow;
+                // A session that just appeared and is playing overrides a manual pick
+                if (!prevIds.Contains(id) && id != _pinnedId) _pinnedId = null;
             }
+            _wasPlaying[id] = playing;
+
             s.PlaybackInfoChanged += OnAnyPlaybackChanged;
+            s.MediaPropertiesChanged += OnAnyMediaChanged;
             _watched.Add(s);
         }
 
@@ -139,7 +159,6 @@ public partial class MainWindow : Window
             var app = session.SourceAppUserModelId ?? "";
             if (app.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) app = app[..^4];
             var dots = string.Concat(Enumerable.Range(0, _sessions.Count).Select(i => i == _index ? "● " : "○ "));
-            SourceText.Text = $"{app}  ({_index + 1}/{_sessions.Count})  {dots}";
             SourceText.Text = $"{dots}";
 
             UpdateTimeline();
@@ -356,7 +375,7 @@ public partial class MainWindow : Window
     // Highest priority first. Use the trimmed name or the raw app id.
     private static readonly string[] _priority =
     {
-        "open.spotify",
+        "open.spotify.com",
         "Spotify",
         "AppleMusic",
         "msedge",
@@ -370,7 +389,7 @@ public partial class MainWindow : Window
     {
         var id = s.SourceAppUserModelId ?? "";
         for (int i = 0; i < _priority.Length; i++)
-            if (_priority[i].Equals(id, StringComparison.OrdinalIgnoreCase))
+            if (id.Contains(_priority[i], StringComparison.OrdinalIgnoreCase))
                 return i;
         return int.MaxValue;
     }
@@ -382,21 +401,41 @@ public partial class MainWindow : Window
     }
 
     private void OnAnyPlaybackChanged(GlobalSystemMediaTransportControlsSession s, object e)
+{
+    Dispatcher.BeginInvoke(() =>
+    {
+        var id = s.SourceAppUserModelId ?? "";
+        bool playing = IsPlaying(s);
+        _wasPlaying.TryGetValue(id, out var was);
+        _wasPlaying[id] = playing;
+
+        // Remember the last moment it was playing (also marks the moment it stopped)
+        if (playing || was) _lastPlaying[id] = DateTime.UtcNow;
+
+        // Started playing: overrides a manual pick
+        if (playing && !was && id != _pinnedId) _pinnedId = null;
+
+        _autoTimer.Stop();
+        _autoTimer.Start();
+    });
+}
+
+    // A new song (metadata change) counts as "just played", even if the status never changed
+    private void OnAnyMediaChanged(GlobalSystemMediaTransportControlsSession s, object e)
     {
         Dispatcher.BeginInvoke(() =>
         {
             var id = s.SourceAppUserModelId ?? "";
-            bool playing = IsPlaying(s);
-            _wasPlaying.TryGetValue(id, out var was);
-            _wasPlaying[id] = playing;
-
-            // Another app started playing: it overrides a manual pick
-            if (playing && !was && id != _pinnedId) _pinnedId = null;
-
-            _autoTimer.Stop();     // debounce: Spotify flickers between songs
+            if (IsPlaying(s))
+            {
+                _lastPlaying[id] = DateTime.UtcNow;
+                if (id != _pinnedId) _pinnedId = null;
+            }
+            _autoTimer.Stop();
             _autoTimer.Start();
         });
     }
+    
 
     private void AutoSelect()
     {
@@ -414,7 +453,7 @@ public partial class MainWindow : Window
         int best = -1, bestRank = int.MaxValue;
         for (int i = 0; i < _sessions.Count; i++)
         {
-            if (!IsPlaying(_sessions[i])) continue;
+            if (!IsRecentlyActive(_sessions[i])) continue;
             int r = Rank(_sessions[i]);
             if (best < 0 || r < bestRank || (r == bestRank && i == _index)) { best = i; bestRank = r; }
         }
