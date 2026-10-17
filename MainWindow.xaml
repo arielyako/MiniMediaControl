@@ -1,0 +1,202 @@
+<Window x:Class="MiniMediaControl.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mini Media Control" Width="380" Height="150"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        SourceInitialized="Window_SourceInitialized" Closing="Window_Closing"
+        MouseWheel="Window_MouseWheel">
+
+    <Window.Resources>
+        <Style x:Key="IconBtn" TargetType="Button">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="8" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#55FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- ===== Seeker colors: edit these ===== -->
+        <SolidColorBrush x:Key="SeekFillBrush"  Color="#1DB954"/>   <!-- played part -->
+        <SolidColorBrush x:Key="SeekTrackBrush" Color="#33FFFFFF"/> <!-- remaining part -->
+        <SolidColorBrush x:Key="SeekDotBrush"   Color="White"/>     <!-- the dot -->
+
+        <!-- Round dot -->
+        <Style x:Key="SeekThumb" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Ellipse Width="12" Height="12" Fill="{StaticResource SeekDotBrush}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Played part of the bar -->
+        <Style x:Key="SeekFillButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                                Background="{StaticResource SeekFillBrush}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Remaining part of the bar -->
+        <Style x:Key="SeekTrackButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                                Background="{StaticResource SeekTrackBrush}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The slider itself -->
+        <Style x:Key="SeekSliderStyle" TargetType="Slider">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="20" Background="Transparent">
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource SeekFillButton}"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource SeekTrackButton}"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource SeekThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="6" CornerRadius="16" Background="#40202026" BorderBrush="#33FFFFFF" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.5"/>
+        </Border.Effect>
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Reset position" Click="ResetPosition_Click"/>
+                <Separator/>
+                <MenuItem Header="Exit" Click="Exit_Click"/>
+            </ContextMenu>
+        </Border.ContextMenu>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="22"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Grip: drag here to move the window -->
+            <Grid Grid.Row="0" Background="Transparent" Cursor="SizeAll"
+                  MouseLeftButtonDown="Grip_MouseDown" MouseLeftButtonUp="Grip_MouseUp">
+                <TextBlock x:Name="SourceText" Margin="14,4,0,0" Foreground="#99FFFFFF" FontSize="11"
+                           HorizontalAlignment="Left"/>
+                <Border Width="36" Height="4" CornerRadius="2" Background="#44FFFFFF"
+                        VerticalAlignment="Top" Margin="0,6,0,0"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,8,0">
+                    <Button Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
+                            Content="&#xE76B;" Click="PrevSource_Click"/>
+                    <Button Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
+                            Content="&#xE76C;" Click="NextSource_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Card that slides when switching source -->
+            <Grid Grid.Row="1" x:Name="Card" Background="Transparent" Margin="12,0,12,10"
+                  PreviewMouseLeftButtonDown="Card_PreviewDown" PreviewMouseLeftButtonUp="Card_PreviewUp">
+                <Grid.RenderTransform>
+                    <TranslateTransform x:Name="Shift"/>
+                </Grid.RenderTransform>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Album art with placeholder -->
+                <Border Grid.Column="0" Width="92" Height="92" CornerRadius="10" Background="#33363F"
+                        VerticalAlignment="Center">
+                    <Grid>
+                        <TextBlock Text="&#x266A;" FontSize="34" Foreground="#66FFFFFF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border CornerRadius="10">
+                            <Border.Background>
+                                <ImageBrush x:Name="ArtBrush" Stretch="UniformToFill"/>
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="18"/>
+                        <RowDefinition Height="36"/>
+                        <RowDefinition Height="20"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="TitleText" Grid.Row="0" Foreground="White" FontSize="14"
+                               FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="Nothing playing"/>
+                    <TextBlock x:Name="ArtistText" Grid.Row="1" Foreground="#AAFFFFFF" FontSize="12"
+                               TextTrimming="CharacterEllipsis"/>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button Style="{StaticResource IconBtn}" Content="&#xE892;" Click="Prev_Click"/>
+                        <Button x:Name="PlayBtn" Style="{StaticResource IconBtn}" Content="&#xE768;"
+                                FontSize="20" Click="PlayPause_Click"/>
+                        <Button Style="{StaticResource IconBtn}" Content="&#xE893;" Click="Next_Click"/>
+                        <TextBlock x:Name="TimeText" Visibility="Collapsed" Foreground="#88FFFFFF" FontSize="11"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </StackPanel>
+
+                    <Slider x:Name="SeekSlider"
+                        Style="{StaticResource SeekSliderStyle}"
+                        Grid.Row="3"
+                        Minimum="0"
+                        Maximum="1"
+                        Height="20"
+                        VerticalAlignment="Center" IsMoveToPointEnabled="True"
+                        PreviewMouseLeftButtonDown="Seek_Down" PreviewMouseLeftButtonUp="Seek_Up"/>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

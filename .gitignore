@@ -1,0 +1,12 @@
+# Build output (publish output is inside bin/)
+bin/
+obj/
+
+# Visual Studio / editor files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Packaging
+*.zip
