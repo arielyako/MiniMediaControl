@@ -151,6 +151,7 @@ public partial class MainWindow : Window
             var bmp = await LoadThumbAsync(props.Thumbnail);
             if (session != _current) return;
             ArtBrush.ImageSource = bmp; // null shows the ♪ placeholder
+            ApplyAccent(bmp);
 
             var status = session.GetPlaybackInfo()?.PlaybackStatus;
             PlayBtn.Content = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
@@ -459,6 +460,86 @@ public partial class MainWindow : Window
         }
 
         if (best >= 0 && best != _index) Select(best);
+    }
+
+    // ---------- Accent from album art ----------
+
+    private static readonly Color BaseColor = Color.FromRgb(0x18, 0x18, 0x1D);     // dark end of the gradient
+    private static readonly Color DefaultAccent = Color.FromRgb(0x9A, 0xA0, 0xB5); // used when there is no art
+    private const byte BgAlpha = 0xC0;      // card transparency (lower = more see-through)
+    private const double AccentMix = 0.55;  // how strong the accent is at the top-left (0..1)
+
+    private void ApplyAccent(BitmapSource? art)
+    {
+        var accent = (art == null ? null : ExtractAccent(art)) ?? DefaultAccent;
+        var top = Lerp(BaseColor, accent, AccentMix);
+
+        // Gradient: accent -> dark, same alpha on both ends so transparency stays consistent
+        Fade(GradTop, Color.FromArgb(BgAlpha, top.R, top.G, top.B));
+        Fade(GradBottom, Color.FromArgb(BgAlpha, BaseColor.R, BaseColor.G, BaseColor.B));
+
+        // Seeker (played part) uses the full-strength accent
+        if (FindResource("SeekFillBrush") is SolidColorBrush seek)
+        {
+            var anim = new ColorAnimation(accent, TimeSpan.FromMilliseconds(450))
+            { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+            seek.BeginAnimation(SolidColorBrush.ColorProperty, anim);
+        }
+    }
+
+    private static void Fade(GradientStop stop, Color to)
+    {
+        var anim = new ColorAnimation(to, TimeSpan.FromMilliseconds(450))
+        { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        stop.BeginAnimation(GradientStop.ColorProperty, anim);
+    }
+
+    private static Color Lerp(Color a, Color b, double t) => Color.FromRgb(
+        (byte)(a.R + (b.R - a.R) * t),
+        (byte)(a.G + (b.G - a.G) * t),
+        (byte)(a.B + (b.B - a.B) * t));
+
+    private static Color? ExtractAccent(BitmapSource src)
+    {
+        try
+        {
+            // Shrink to ~24x24 so this is nearly free
+            var scaled = new TransformedBitmap(src,
+                new ScaleTransform(24.0 / src.PixelWidth, 24.0 / src.PixelHeight));
+            var bgra = new FormatConvertedBitmap(scaled, PixelFormats.Bgra32, null, 0);
+
+            int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+            var px = new byte[h * stride];
+            bgra.CopyPixels(px, stride, 0);
+
+            double r = 0, g = 0, b = 0, total = 0;
+            for (int i = 0; i < px.Length; i += 4)
+            {
+                double B = px[i], G = px[i + 1], R = px[i + 2];
+                double max = Math.Max(R, Math.Max(G, B));
+                double min = Math.Min(R, Math.Min(G, B));
+                double sat = max <= 0 ? 0 : (max - min) / max;
+
+                // Favor vivid, reasonably bright pixels so the result isn't muddy
+                double weight = 0.02 + sat * (max / 255.0);
+                r += R * weight; g += G * weight; b += B * weight; total += weight;
+            }
+            if (total <= 0) return null;
+
+            r /= total; g /= total; b /= total;
+
+            // Keep it bright enough to see on a dark card, but not blinding
+            double peak = Math.Max(r, Math.Max(g, b));
+            if (peak < 1) return null;
+            double target = Math.Clamp(peak, 170, 235);
+            double k = target / peak;
+
+            return Color.FromRgb(
+                (byte)Math.Min(255, r * k),
+                (byte)Math.Min(255, g * k),
+                (byte)Math.Min(255, b * k));
+        }
+        catch { return null; }
     }
 
     // private static readonly string NamesPath = Path.Combine(

@@ -107,7 +107,13 @@
         </Style>
     </Window.Resources>
 
-    <Border Margin="6" CornerRadius="16" Background="#40202026" BorderBrush="#33FFFFFF" BorderThickness="1">
+    <Border Margin="6" CornerRadius="16" BorderBrush="#33FFFFFF" BorderThickness="1">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop x:Name="GradTop"    Color="#F0202026" Offset="0"/>
+                <GradientStop x:Name="GradBottom" Color="#F0202026" Offset="0.85"/>
+            </LinearGradientBrush>
+        </Border.Background>
         <Border.Effect>
             <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.5"/>
         </Border.Effect>
@@ -157,7 +163,9 @@
                     <Grid>
                         <TextBlock Text="&#x266A;" FontSize="34" Foreground="#66FFFFFF"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                   
                         <Border CornerRadius="10">
+                            
                             <Border.Background>
                                 <ImageBrush x:Name="ArtBrush" Stretch="UniformToFill"/>
                             </Border.Background>
