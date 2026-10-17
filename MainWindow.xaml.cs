@@ -36,7 +36,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         RestorePosition();
-
+        LoadPriority();
+        
+        _autoTimer.Tick += (_, _) => { _autoTimer.Stop(); AutoSelect(); };
         _tick.Tick += (_, _) => UpdateTimeline();
         _tick.Start();
         _topTimer.Tick += (_, _) => ReassertTopmost();
@@ -56,6 +58,9 @@ public partial class MainWindow : Window
     {
         if (_mgr == null) return;
 
+        foreach (var w in _watched) w.PlaybackInfoChanged -= OnAnyPlaybackChanged;
+        _watched.Clear();
+
         var prevId = _current?.SourceAppUserModelId;
         _sessions = _mgr.GetSessions().ToList();
 
@@ -63,17 +68,34 @@ public partial class MainWindow : Window
         {
             Detach();
             _current = null;
+            _pinnedId = null;
+            _wasPlaying.Clear();
+            SetHotkeys(false);      // delete this line if you didn't add the volume-knob code
             Hide();
             return;
         }
 
+        foreach (var s in _sessions)
+        {
+            var id = s.SourceAppUserModelId ?? "";
+            if (!_wasPlaying.ContainsKey(id))
+            {
+                bool playing = IsPlaying(s);
+                if (playing && id != _pinnedId) _pinnedId = null;   // new session already playing
+                _wasPlaying[id] = playing;
+            }
+            s.PlaybackInfoChanged += OnAnyPlaybackChanged;
+            _watched.Add(s);
+        }
+
         if (!IsVisible) Show();
+        SetHotkeys(true);           // delete this line if you didn't add the volume-knob code
 
         int idx = prevId == null ? -1 : _sessions.FindIndex(s => s.SourceAppUserModelId == prevId);
         if (idx < 0) idx = Math.Min(_index, _sessions.Count - 1);
         Select(idx);
+        AutoSelect();
     }
-
     private void Select(int index)
     {
         Detach();
@@ -240,6 +262,7 @@ public partial class MainWindow : Window
         outAnim.Completed += (_, _) =>
         {
             Select(next);
+            if (next < _sessions.Count) _pinnedId = _sessions[next].SourceAppUserModelId;
             var inAnim = new DoubleAnimation(dir * w, 0, TimeSpan.FromMilliseconds(180))
             { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
             inAnim.Completed += (_, _) => _sliding = false;
@@ -329,6 +352,95 @@ public partial class MainWindow : Window
     private void ResetPosition_Click(object s, RoutedEventArgs e) { DefaultPosition(); SavePosition(); }
     private void Exit_Click(object s, RoutedEventArgs e) => Application.Current.Shutdown();
     private void Window_Closing(object? s, System.ComponentModel.CancelEventArgs e) => SavePosition();
+
+    // ---------- Priority / auto-select ----------
+
+
+    // Highest priority first. Use the trimmed name or the raw app id.
+    private static readonly string[] _priority =
+    {
+        "open.spotify",
+        "Spotify",
+        "AppleMusic",
+        "msedge",
+    };
+    private string? _pinnedId; // manual choice
+    private readonly Dictionary<string, bool> _wasPlaying = new();
+    private readonly List<GlobalSystemMediaTransportControlsSession> _watched = new();
+    private readonly DispatcherTimer _autoTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
+
+    private void LoadPriority()
+    {
+        try
+        {
+            if (!File.Exists(PriorityPath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(PriorityPath)!);
+                File.WriteAllText(PriorityPath,
+                    JsonSerializer.Serialize(new[] { "Spotify" }, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            _priority = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(PriorityPath)) ?? new();
+        }
+        catch { }
+    }
+
+    private int Rank(GlobalSystemMediaTransportControlsSession s)
+    {
+        var id = s.SourceAppUserModelId ?? "";
+        var trimmed = TrimAppId(id);
+        for (int i = 0; i < _priority.Count; i++)
+            if (_priority[i].Equals(id, StringComparison.OrdinalIgnoreCase) ||
+                _priority[i].Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+                return i;
+        return int.MaxValue;
+    }
+
+    private static bool IsPlaying(GlobalSystemMediaTransportControlsSession s)
+    {
+        try { return s.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing; }
+        catch { return false; }
+    }
+
+    private void OnAnyPlaybackChanged(GlobalSystemMediaTransportControlsSession s, object e)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            var id = s.SourceAppUserModelId ?? "";
+            bool playing = IsPlaying(s);
+            _wasPlaying.TryGetValue(id, out var was);
+            _wasPlaying[id] = playing;
+
+            // Another app started playing: it overrides a manual pick
+            if (playing && !was && id != _pinnedId) _pinnedId = null;
+
+            _autoTimer.Stop();     // debounce: Spotify flickers between songs
+            _autoTimer.Start();
+        });
+    }
+
+    private void AutoSelect()
+    {
+        if (_sessions.Count == 0) return;
+
+        // Honor a manual pick
+        if (_pinnedId != null)
+        {
+            int p = _sessions.FindIndex(s => s.SourceAppUserModelId == _pinnedId);
+            if (p >= 0) { if (p != _index) Select(p); return; }
+            _pinnedId = null;
+        }
+
+        // Best playing session by priority; ties keep the current one
+        int best = -1, bestRank = int.MaxValue;
+        for (int i = 0; i < _sessions.Count; i++)
+        {
+            if (!IsPlaying(_sessions[i])) continue;
+            int r = Rank(_sessions[i]);
+            if (best < 0 || r < bestRank || (r == bestRank && i == _index)) { best = i; bestRank = r; }
+        }
+
+        if (best >= 0 && best != _index) Select(best);
+    }
 
     // private static readonly string NamesPath = Path.Combine(
     // Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
