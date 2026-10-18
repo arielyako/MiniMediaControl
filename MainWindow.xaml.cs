@@ -154,8 +154,9 @@ public partial class MainWindow : Window
             ApplyAccent(bmp);
 
             var status = session.GetPlaybackInfo()?.PlaybackStatus;
-            PlayBtn.Content = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
-                ? "\uE769" : "\uE768";
+            PlayIcon.Data = (Geometry)FindResource(
+            status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
+                    ? "IconPause" : "IconPlay");
 
             var app = session.SourceAppUserModelId ?? "";
             if (app.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) app = app[..^4];

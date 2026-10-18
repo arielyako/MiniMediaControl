@@ -105,6 +105,21 @@
                 </Setter.Value>
             </Setter>
         </Style>
+    <!-- Icon shapes on a 24x24 canvas -->
+    <Geometry x:Key="IconPlay">M7,5 L19,12 L7,19 Z</Geometry>
+    <Geometry x:Key="IconPause">M8,6 L8,18 M16,6 L16,18</Geometry>
+    <Geometry x:Key="IconNext">M6,6 L16,12 L6,18 Z M19,6 L19,18</Geometry>
+    <Geometry x:Key="IconPrev">M18,6 L8,12 L18,18 Z M5,6 L5,18</Geometry>
+
+    <!-- Fat rounded look: filled shape + thick stroke with round joins and caps -->
+    <Style x:Key="IconPath" TargetType="Path">
+        <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+        <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+        <Setter Property="StrokeThickness" Value="3"/>
+        <Setter Property="StrokeLineJoin" Value="Round"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+    </Style>
     </Window.Resources>
 
     <Border Margin="6" CornerRadius="16" BorderBrush="#33FFFFFF" BorderThickness="1">
@@ -143,6 +158,8 @@
                             Content="&#xE76B;" Click="PrevSource_Click"/>
                     <Button Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
                             Content="&#xE76C;" Click="NextSource_Click"/>
+                    <Button x:Name="CloseBtn" Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
+                            Content="&#xE711;" />
                 </StackPanel>
             </Grid>
 
@@ -196,10 +213,29 @@
                         PreviewMouseLeftButtonDown="Seek_Down" PreviewMouseLeftButtonUp="Seek_Up"/>
                     
                     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Style="{StaticResource IconBtn}" Content="&#xE892;" Click="Prev_Click"/>
-                        <Button x:Name="PlayBtn" Style="{StaticResource IconBtn}" Content="&#xE768;"
-                                FontSize="20" Click="PlayPause_Click"/>
-                        <Button Style="{StaticResource IconBtn}" Content="&#xE893;" Click="Next_Click"/>
+                        <Button Style="{StaticResource IconBtn}" Click="Prev_Click">
+                            <Viewbox Width="18" Height="18">
+                                <Canvas Width="24" Height="24">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPrev}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+
+                        <Button x:Name="PlayBtn" Style="{StaticResource IconBtn}" Click="PlayPause_Click">
+                            <Viewbox Width="22" Height="22">
+                                <Canvas Width="24" Height="24">
+                                    <Path x:Name="PlayIcon" Style="{StaticResource IconPath}" Data="{StaticResource IconPlay}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+
+                        <Button Style="{StaticResource IconBtn}" Click="Next_Click">
+                            <Viewbox Width="18" Height="18">
+                                <Canvas Width="24" Height="24">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconNext}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
                         <TextBlock x:Name="TimeText" Visibility="Collapsed" Foreground="#88FFFFFF" FontSize="11"
                                    VerticalAlignment="Center" Margin="0,0,0,0"/>
                     </StackPanel>
