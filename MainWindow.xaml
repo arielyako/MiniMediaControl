@@ -44,7 +44,48 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
-                        <Ellipse Width="12" Height="12" Fill="{StaticResource SeekDotBrush}"/>
+                        <!-- Canvas = the thumb's real size (must match Width/Height on the Thumb) -->
+                        <Canvas Width="12" Height="20">
+
+                            <!-- Glow: free to overflow. Left/Top = -(glow size - thumb size) / 2 -->
+                            <Grid x:Name="glow" Width="28" Height="28"
+                                Canvas.Left="-8" Canvas.Top="-4"
+                                RenderTransformOrigin="0.5,0.5" IsHitTestVisible="False">
+
+                                <Ellipse x:Name="halo" Fill="{StaticResource SeekFillBrush}" Opacity="0.55">
+                                    <Ellipse.OpacityMask>
+                                        <RadialGradientBrush RadiusX="0.5" RadiusY="0.5">
+                                            <GradientStop Color="#FF000000" Offset="0.0"/>
+                                            <GradientStop Color="#80000000" Offset="0.45"/>
+                                            <GradientStop Color="#00000000" Offset="1.0"/>
+                                        </RadialGradientBrush>
+                                    </Ellipse.OpacityMask>
+                                </Ellipse>
+
+                                <Ellipse x:Name="core" Width="10" Height="10" Fill="White" Opacity="0.85">
+                                    <Ellipse.OpacityMask>
+                                        <RadialGradientBrush>
+                                            <GradientStop Color="#FF000000" Offset="0.2"/>
+                                            <GradientStop Color="#00000000" Offset="1.0"/>
+                                        </RadialGradientBrush>
+                                    </Ellipse.OpacityMask>
+                                </Ellipse>
+                            </Grid>
+
+                            <!-- Invisible hit area so the thumb is still easy to grab -->
+                            <Rectangle Width="12" Height="20" Fill="Transparent"/>
+                        </Canvas>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="halo" Property="Opacity" Value="0.9"/>
+                                <Setter TargetName="glow" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.2" ScaleY="1.2"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -65,14 +106,14 @@
         </Style>
 
         <!-- Remaining part of the bar -->
-        <Style x:Key="SeekTrackButton" TargetType="RepeatButton">
+        <Style x:Key="SeekTrackButton" TargetType="RepeatButton" >
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="IsTabStop" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RepeatButton">
                         <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
-                                Background="{StaticResource SeekTrackBrush}"/>
+                                Background="Transparent"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -84,6 +125,8 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
                         <Grid Height="20" Background="Transparent">
+                            <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                                    Background="{StaticResource SeekTrackBrush}"/>
                             <Track x:Name="PART_Track" VerticalAlignment="Center">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource SeekFillButton}"/>
@@ -92,13 +135,19 @@
                                     <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource SeekTrackButton}"/>
                                 </Track.IncreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb Style="{StaticResource SeekThumb}"/>
+                                    <Thumb x:Name="dot" Style="{StaticResource SeekThumb}" Opacity="0" Width="12" Height="20"/>
                                 </Track.Thumb>
                             </Track>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="dot" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger SourceName="dot" Property="IsDragging" Value="True">
+                                <Setter TargetName="dot" Property="Opacity" Value="1"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -204,6 +253,7 @@
                                TextTrimming="CharacterEllipsis"/>
 
                     <Slider x:Name="SeekSlider"
+                        Panel.ZIndex="10"
                         Style="{StaticResource SeekSliderStyle}"
                         Grid.Row="2"
                         Minimum="0"
