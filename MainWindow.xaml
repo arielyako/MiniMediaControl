@@ -203,12 +203,12 @@
                 <Border Width="36" Height="4" CornerRadius="2" Background="#44FFFFFF"
                         VerticalAlignment="Top" Margin="0,6,0,0"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,8,0">
-                    <Button Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
+                    <Button x:Name="PrevSourceBtn" Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
                             Content="&#xE76B;" Click="PrevSource_Click"/>
-                    <Button Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
+                    <Button x:Name="NextSourceBtn" Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
                             Content="&#xE76C;" Click="NextSource_Click"/>
                     <Button x:Name="CloseBtn" Style="{StaticResource IconBtn}" Width="24" Height="20" FontSize="10"
-                            Content="&#xE711;" />
+                            Content="&#xE711;" Click="Close_Click"/>
                 </StackPanel>
             </Grid>
 
@@ -224,7 +224,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Album art with placeholder -->
-                <Border Grid.Column="0" Width="92" Height="92" CornerRadius="10" Background="#33363F"
+                <Border x:Name="ArtBorder" Grid.Column="0" Width="92" Height="92" CornerRadius="10" Background="#33363F"
                         VerticalAlignment="Center">
                     <Grid>
                         <TextBlock Text="&#x266A;" FontSize="34" Foreground="#66FFFFFF"
@@ -262,7 +262,7 @@
                         VerticalAlignment="Center" IsMoveToPointEnabled="True"
                         PreviewMouseLeftButtonDown="Seek_Down" PreviewMouseLeftButtonUp="Seek_Up"/>
                     
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <StackPanel x:Name="ControlsPanel" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Style="{StaticResource IconBtn}" Click="Prev_Click">
                             <Viewbox Width="18" Height="18">
                                 <Canvas Width="24" Height="24">

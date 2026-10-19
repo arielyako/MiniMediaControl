@@ -35,6 +35,13 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, DateTime> _lastPlaying = new();
     private static readonly TimeSpan Grace = TimeSpan.FromSeconds(4);
 
+    private readonly DispatcherTimer _lingerTimer = new() { Interval = TimeSpan.FromSeconds(30) };  // how long the card stays after media stops
+    private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromMilliseconds(150) }; // merges bursts of Windows events
+    private string? _shownSig;
+    private bool _hasContent, _noFadeOnce;
+    private int _updateSeq;
+
+
     public MainWindow()
     {
         InitializeComponent();
@@ -45,6 +52,8 @@ public partial class MainWindow : Window
         _tick.Start();
         _topTimer.Tick += (_, _) => ReassertTopmost();
         _topTimer.Start();
+        _lingerTimer.Tick += (_, _) => { _lingerTimer.Stop(); Hide(); };
+        _updateTimer.Tick += (_, _) => { _updateTimer.Stop(); _ = UpdateMediaAsync(); };
 
         Loaded += async (_, _) =>
         {
@@ -77,16 +86,24 @@ public partial class MainWindow : Window
         var prevId = _current?.SourceAppUserModelId;
         var prevIds = _sessions.Select(x => x.SourceAppUserModelId ?? "").ToHashSet();
         _sessions = _mgr.GetSessions().ToList();
+        UpdateSourceButtons();
 
         if (_sessions.Count == 0)
         {
             Detach();
             _current = null;
             _pinnedId = null;
-            _wasPlaying.Clear();
-            Hide();
+
+            if (!_hasContent) { Hide(); return; }   // nothing was ever shown, so no need to linger
+
+            SetIdle(true);                          // keep the last media, disable controls
+            _lingerTimer.Stop();
+            _lingerTimer.Start();                   // hide after the linger period
             return;
         }
+
+        _lingerTimer.Stop();
+        SetIdle(false);
 
         foreach (var s in _sessions)
         {
@@ -96,7 +113,6 @@ public partial class MainWindow : Window
             if (playing)
             {
                 _lastPlaying[id] = DateTime.UtcNow;
-                // A session that just appeared and is playing overrides a manual pick
                 if (!prevIds.Contains(id) && id != _pinnedId) _pinnedId = null;
             }
             _wasPlaying[id] = playing;
@@ -120,7 +136,6 @@ public partial class MainWindow : Window
         _current = _sessions[index];
         _current.MediaPropertiesChanged += OnSessionChanged;
         _current.PlaybackInfoChanged += OnSessionChanged;
-        _current.TimelinePropertiesChanged += OnSessionChanged;
         _ = UpdateMediaAsync();
     }
 
@@ -129,41 +144,60 @@ public partial class MainWindow : Window
         if (_current == null) return;
         _current.MediaPropertiesChanged -= OnSessionChanged;
         _current.PlaybackInfoChanged -= OnSessionChanged;
-        _current.TimelinePropertiesChanged -= OnSessionChanged;
     }
 
     private void OnSessionChanged(GlobalSystemMediaTransportControlsSession s, object e) =>
-        Dispatcher.BeginInvoke(() => _ = UpdateMediaAsync());
+        Dispatcher.BeginInvoke(() => { _updateTimer.Stop(); _updateTimer.Start(); });
 
     private async Task UpdateMediaAsync()
     {
         var session = _current;
         if (session == null) return;
+        int seq = ++_updateSeq;
 
         try
         {
             var props = await session.TryGetMediaPropertiesAsync();
-            if (session != _current) return; // switched while awaiting
-
-            TitleText.Text = string.IsNullOrWhiteSpace(props.Title) ? "Unknown title" : props.Title;
-            ArtistText.Text = props.Artist;
+            if (session != _current || seq != _updateSeq) return;
 
             var bmp = await LoadThumbAsync(props.Thumbnail);
-            if (session != _current) return;
-            ArtBrush.ImageSource = bmp; // null shows the ♪ placeholder
+            if (session != _current || seq != _updateSeq) return;
+
+            var rawId = session.SourceAppUserModelId ?? "";
+            var title = string.IsNullOrWhiteSpace(props.Title) ? "Unknown title" : props.Title;
+            var sig = $"{rawId}|{title}|{props.Artist}";
+
+            // Fade only when the song/app really changed (not on pause, seek or duplicate events)
+            bool fade = _hasContent && IsVisible && !_noFadeOnce && sig != _shownSig;
+            _noFadeOnce = false;
+            _shownSig = sig;
+
+            if (fade)
+            {
+                await FadeAsync(0, 120);                                   // fade out
+                if (session != _current || seq != _updateSeq) return;      // a newer update takes over
+            }
+
+            // ---- apply new content ----
+            TitleText.Text = title;
+            ArtistText.Text = props.Artist;
+            ArtBrush.ImageSource = bmp;
             ApplyAccent(bmp);
 
             var status = session.GetPlaybackInfo()?.PlaybackStatus;
             PlayIcon.Data = (Geometry)FindResource(
-            status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
+                status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
                     ? "IconPause" : "IconPlay");
 
-            var app = session.SourceAppUserModelId ?? "";
-            if (app.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) app = app[..^4];
-            var dots = string.Concat(Enumerable.Range(0, _sessions.Count).Select(i => i == _index ? "● " : "○ "));
-            SourceText.Text = $"{dots}";
+            SourceText.ToolTip = rawId;   // hover the dots to see which app it is
+            SourceText.Text = _sessions.Count > 1
+                ? string.Concat(Enumerable.Range(0, _sessions.Count).Select(i => i == _index ? "● " : "○ ")).TrimEnd()
+                : "";
 
+            _hasContent = true;
             UpdateTimeline();
+
+            if (TitleText.Opacity < 0.99) await FadeAsync(1, 200);         // fade in
         }
         catch { /* session may have vanished */ }
     }
@@ -279,6 +313,7 @@ public partial class MainWindow : Window
 
         outAnim.Completed += (_, _) =>
         {
+            _noFadeOnce = true;
             Select(next);
             if (next < _sessions.Count) _pinnedId = _sessions[next].SourceAppUserModelId;
             var inAnim = new DoubleAnimation(dir * w, 0, TimeSpan.FromMilliseconds(180))
@@ -542,6 +577,37 @@ public partial class MainWindow : Window
         }
         catch { return null; }
     }
+
+    private void SetIdle(bool idle)
+    {
+        ControlsPanel.IsEnabled = !idle;
+        ControlsPanel.Opacity = idle ? 0.4 : 1.0;   // dim level for disabled buttons
+        SeekSlider.IsEnabled = !idle;
+    }
+
+    private async Task FadeAsync(double to, int ms)
+    {
+        var tcs = new TaskCompletionSource();
+        bool first = true;
+        foreach (var el in new UIElement[] { ArtBorder, TitleText, ArtistText })
+        {
+            var a = new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms))
+            { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+            if (first) { a.Completed += (_, _) => tcs.TrySetResult(); first = false; }
+            el.BeginAnimation(UIElement.OpacityProperty, a);
+        }
+        // The timeout keeps us from hanging if an animation gets replaced mid-way
+        await Task.WhenAny(tcs.Task, Task.Delay(ms + 150));
+    }
+
+    private void UpdateSourceButtons()
+    {
+        var v = _sessions.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        PrevSourceBtn.Visibility = v;
+        NextSourceBtn.Visibility = v;
+    }
+
+    private void Close_Click(object s, RoutedEventArgs e) => Application.Current.Shutdown();
 
     // private static readonly string NamesPath = Path.Combine(
     // Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
