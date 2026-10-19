@@ -8,5 +8,8 @@
     <AssemblyName>MiniMediaControl</AssemblyName>
     <RootNamespace>MiniMediaControl</RootNamespace>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Version>0.1.0</Version>
+    <Product>Mini Media Control</Product>
+    <Company>arielyako</Company>
   </PropertyGroup>
 </Project>
