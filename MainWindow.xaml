@@ -253,9 +253,9 @@
                         <RowDefinition Height="35"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Name="TitleText" Grid.Row="0" Foreground="White" FontSize="14"
+                    <TextBlock x:Name="TitleText" Grid.Row="0" Foreground="{DynamicResource AccentLightBrush}" FontSize="14"
                                FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="Nothing playing"/>
-                    <TextBlock x:Name="ArtistText" Grid.Row="1" Foreground="#55FFFFFF" FontSize="12"
+                    <TextBlock x:Name="ArtistText" Grid.Row="1" Foreground="{DynamicResource AccentLightBrush}" Opacity="0.52" FontSize="12"
                                TextTrimming="CharacterEllipsis"/>
 
                     <Slider x:Name="SeekSlider"
