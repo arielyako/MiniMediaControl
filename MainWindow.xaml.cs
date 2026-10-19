@@ -521,6 +521,13 @@ public partial class MainWindow : Window
             { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
             seek.BeginAnimation(SolidColorBrush.ColorProperty, anim);
         }
+        var dark = Lerp(accent, Colors.Black, 0.65);
+        SetBrush("AccentLightBrush", Lerp(accent, Colors.White, 0.44));
+        
+        SetBrush("AccentDarkBrush", Color.FromArgb(0xD0, dark.R, dark.G, dark.B));
+
+        var track = Lerp(accent, Colors.Black, 0.55);
+        SetBrush("SeekTrackBrush", Color.FromArgb(0xFF, track.R, track.G, track.B));
     }
 
     private static void Fade(GradientStop stop, Color to)
@@ -577,6 +584,18 @@ public partial class MainWindow : Window
         }
         catch { return null; }
     }
+
+    // private void SetBrush(string key, Color to)
+    // {
+    //     if (FindResource(key) is SolidColorBrush b && !b.IsFrozen)
+    //     {
+    //         b.BeginAnimation(SolidColorBrush.ColorProperty,
+    //             new ColorAnimation(to, TimeSpan.FromMilliseconds(450))
+    //             { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+    //     }
+    // }
+
+    private void SetBrush(string key, Color to) => Resources[key] = new SolidColorBrush(to);
 
     private void SetIdle(bool idle)
     {

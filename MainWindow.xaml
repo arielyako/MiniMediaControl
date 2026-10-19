@@ -9,12 +9,16 @@
         MouseWheel="Window_MouseWheel">
 
     <Window.Resources>
+        <SolidColorBrush x:Key="AccentLightBrush" Color="#C9CEE0"/>   <!-- icon color (placeholder until the first track) -->
+        <SolidColorBrush x:Key="AccentDarkBrush"  Color="#D0383B48"/> <!-- hover background -->
+
         <Style x:Key="IconBtn" TargetType="Button">
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentLightBrush}"/>
             <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Width" Value="36"/>
-            <Setter Property="Height" Value="32"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="3,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -24,20 +28,22 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#33FFFFFF"/>
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentDarkBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#55FFFFFF"/>
+                                <Setter TargetName="bd" Property="Opacity" Value="0.7"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+        
         <!-- ===== Seeker colors: edit these ===== -->
         <SolidColorBrush x:Key="SeekFillBrush"  Color="#1DB954"/>   <!-- played part -->
-        <SolidColorBrush x:Key="SeekTrackBrush" Color="#33FFFFFF"/> <!-- remaining part -->
+        <SolidColorBrush x:Key="SeekTrackBrush" Color="#11FFFFFF"/> <!-- remaining part -->
         <SolidColorBrush x:Key="SeekDotBrush"   Color="White"/>     <!-- the dot -->
+        
 
         <!-- Round dot -->
         <Style x:Key="SeekThumb" TargetType="Thumb">
@@ -126,7 +132,7 @@
                     <ControlTemplate TargetType="Slider">
                         <Grid Height="20" Background="Transparent">
                             <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
-                                    Background="{StaticResource SeekTrackBrush}"/>
+                                    Background="{DynamicResource AccentDarkBrush}"/>
                             <Track x:Name="PART_Track" VerticalAlignment="Center">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource SeekFillButton}"/>
@@ -249,7 +255,7 @@
 
                     <TextBlock x:Name="TitleText" Grid.Row="0" Foreground="White" FontSize="14"
                                FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="Nothing playing"/>
-                    <TextBlock x:Name="ArtistText" Grid.Row="1" Foreground="#AAFFFFFF" FontSize="12"
+                    <TextBlock x:Name="ArtistText" Grid.Row="1" Foreground="#55FFFFFF" FontSize="12"
                                TextTrimming="CharacterEllipsis"/>
 
                     <Slider x:Name="SeekSlider"
