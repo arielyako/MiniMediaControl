@@ -524,7 +524,8 @@ public partial class MainWindow : Window
         var dark = Lerp(accent, Colors.Black, 0.65);
         SetBrush("AccentLightBrush", Lerp(accent, Colors.White, 0.44));
         
-        SetBrush("AccentDarkBrush", Color.FromArgb(0xD0, dark.R, dark.G, dark.B));
+        // SetBrush("AccentDarkBrush", Color.FromArgb(0xD0, dark.R, dark.G, dark.B));
+        SetBrush("AccentHoverBrush", Color.FromArgb(0x55, accent.R, accent.G, accent.B));
 
         var track = Lerp(accent, Colors.Black, 0.55);
         SetBrush("SeekTrackBrush", Color.FromArgb(0xFF, track.R, track.G, track.B));
